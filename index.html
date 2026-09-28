@@ -169,6 +169,8 @@
 </div>
 
 <script>
+(function(){
+'use strict';
 const $ = id => document.getElementById(id);
 const cv = $('game'), ctx = cv.getContext('2d');
 const W = cv.width, H = cv.height;
@@ -182,8 +184,18 @@ const store = {
   get(k,d){ try{ const v = localStorage.getItem(k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
   set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 };
-let unlocked = clamp(Number(store.get('hbLevel',1)) || 1, 1, 101);
-let best = Number(store.get('hbBest',0)) || 0;
+const sign = t => { let h = 5381; t = 'hb#heydari!' + t; for(let i=0;i<t.length;i++) h = ((h*33) ^ t.charCodeAt(i)) >>> 0; return h; };
+let unlocked = 1, best = 0;
+(function loadProgress(){
+  const L = Number(store.get('hbLevel',1)) || 1, B = Number(store.get('hbBest',0)) || 0;
+  const sL = store.get('hbSig', null), sB = store.get('hbBSig', null);
+  unlocked = (sL === null || sL === sign('L'+L)) ? clamp(L, 1, 101) : 1;
+  best = (sB === null || sB === sign('B'+B)) ? clamp(B, 0, 5000) : 0;
+})();
+function saveProgress(){
+  store.set('hbLevel', unlocked); store.set('hbSig', sign('L'+unlocked));
+  store.set('hbBest', best);      store.set('hbBSig', sign('B'+best));
+}
 window.getProgress = () => ({ cleared: clamp(unlocked,1,101) - 1, best: Math.floor(best) });
 const settings = store.get('hbSet', {vol:60, diff:1, gfx:true});
 $('volume').value = settings.vol; $('difficulty').value = String(settings.diff); $('graphics').checked = !!settings.gfx;
@@ -274,7 +286,7 @@ let screen = 'map', state = null, mapWorld = 0, modalOpen = false, pausedByMenu 
 function freshState(level){
   return { level, phase:'play', paused:false, speed:6, y:GROUND, vy:0, air:false, legPhase:0,
     obstacles:[], sinceCar:0, gap:380, score:0, target:200+level*25,
-    student:null, studentSpawned:false, cloud:null, cloudT:0, pop:null, dizzy:0 };
+    student:null, studentSpawned:false, t:0, cloud:null, cloudT:0, pop:null, dizzy:0 };
 }
 function newRun(level){ state = freshState(level); scrollX = 0; $('banner').classList.remove('show'); }
 
@@ -293,7 +305,7 @@ function restart(){ newRun(state.level); }
 
 function die(){
   const s = state; s.phase = 'dead'; s.dizzy = 0; sfx.die();
-  best = Math.max(best, Math.floor(s.score)); store.set('hbBest', best);
+  best = Math.max(best, Math.floor(s.score)); saveProgress();
   if(window.LB) LB.submit();
   $('bannerSub').textContent = 'امتیاز: ' + toFa(Math.floor(s.score)) + ' — رکورد: ' + toFa(best);
   $('banner').classList.add('show');
@@ -309,12 +321,13 @@ function makeCloud(x, y){
 
 function catchStudent(){
   const s = state, st = s.student;
+  if(s.phase !== 'play' || !st || s.t < 180) return;
   s.phase = 'cloud'; s.cloudT = 0;
   s.cloud = makeCloud((PX + st.x)/2, GROUND - 26);
   sfx.poof(); sfx.win();
-  best = Math.max(best, Math.floor(s.score)); store.set('hbBest', best);
-  if(s.level >= unlocked){
-    unlocked = Math.min(101, s.level + 1); store.set('hbLevel', unlocked);
+  best = Math.max(best, Math.floor(s.score)); saveProgress();
+  if(s.level === unlocked){
+    unlocked = Math.min(101, s.level + 1); saveProgress();
     s.pop = s.level < 100 ? s.level + 1 : null;
   }
   if(window.LB) LB.submit();
@@ -331,6 +344,7 @@ function update(dt){
   if(s.phase === 'dead'){ s.dizzy += dt; return; }
 
   const diff = Number($('difficulty').value);
+  s.t += dt;
   s.speed = (5.2 + s.level*0.05 + s.score/450) * diff;
   scrollX += s.speed*dt;
   if(s.air){
@@ -640,6 +654,8 @@ function showMap(pop, cleared){
 }
 
 function startLevel(L){
+  L = Math.floor(Number(L));
+  if(!(L >= 1 && L <= 100 && L <= unlocked)) return;
   screen = 'game';
   $('map').classList.remove('active'); $('gameScreen').classList.add('active');
   buildWorld(worldOf(L)); newRun(L);
@@ -674,7 +690,7 @@ $('retryBtn').onclick = restart;
 $('bannerMap').onclick = () => showMap(null, null);
 $('resetBtn').onclick = () => {
   if(!confirm('مطمئنی؟ همه پیشرفت و مرحله‌های باز شده پاک میشه.')) return;
-  unlocked = 1; store.set('hbLevel', 1); best = 0; store.set('hbBest', 0);
+  unlocked = 1; best = 0; saveProgress();
   pausedByMenu = false; closeMenu(); showMap(null, null);
 };
 $('downloadBtn').onclick = async () => {
@@ -703,41 +719,37 @@ document.addEventListener('visibilitychange', () => {
 buildWorld(0); state = freshState(1);
 showMap(null, null);
 requestAnimationFrame(frame);
+})();
 </script>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, setDoc, collection, query, orderBy, limit, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const SB_URL = "https://xhyhyvgbushqaghiqiqu.supabase.co";
+const SB_KEY = "sb_publishable_HfudeNsfnEV7pCthVvUWbw_5ETPA-x-";
 
-// ⬇️ اطلاعات پروژه‌ی Firebase خودت رو اینجا جایگزین کن
-const FIREBASE_CONFIG = {
-  apiKey: "PASTE_API_KEY",
-  authDomain: "PASTE_PROJECT.firebaseapp.com",
-  projectId: "PASTE_PROJECT_ID",
-  appId: "PASTE_APP_ID"
-};
-
-const enabled = !FIREBASE_CONFIG.apiKey.startsWith('PASTE');
-let db, uidPromise;
-if(enabled){
-  const app = initializeApp(FIREBASE_CONFIG);
-  db = getFirestore(app);
-  uidPromise = signInAnonymously(getAuth(app)).then(c => c.user.uid).catch(() => null);
-}
 const el = id => document.getElementById(id);
 const fa = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
 const getName = () => (localStorage.getItem('hbName') || '').trim().slice(0, 16);
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&3|8)).toString(16); }));
+let myId = localStorage.getItem('hbId');
+if(!myId){ myId = uuid(); localStorage.setItem('hbId', myId); }
+
+async function rpc(fn, body){
+  const r = await fetch(SB_URL + '/rest/v1/rpc/' + fn, {
+    method: 'POST',
+    headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error('http ' + r.status);
+  const t = await r.text(); return t ? JSON.parse(t) : null;
+}
 
 let last = 0, timer = null;
 async function doSubmit(){
-  if(!enabled) return;
   const name = getName(); if(!name) return;
   const p = window.getProgress(); const best = Math.min(p.best, 5000);
   if(p.cleared <= 0 && best <= 0) return;
-  const uid = await uidPromise; if(!uid) return;
   try{
-    await setDoc(doc(db, 'scores', uid), { name, cleared:p.cleared, best, rank:p.cleared*10000 + best, updated:serverTimestamp() });
+    await rpc('submit_score', { p_id: myId, p_name: name, p_cleared: Math.min(p.cleared, 100), p_best: best });
     last = Date.now();
   }catch(e){}
 }
@@ -748,17 +760,14 @@ function submit(){
 
 async function load(){
   const list = el('lbList');
-  if(!enabled){ el('lbOff').style.display = 'block'; list.textContent = ''; return; }
   list.textContent = 'در حال بارگذاری...';
   try{
-    const [snap, uid] = await Promise.all([
-      getDocs(query(collection(db, 'scores'), orderBy('rank', 'desc'), limit(10))), uidPromise ]);
+    const rows = await rpc('top_scores', { p_me: myId });
     list.textContent = '';
-    if(snap.empty){ list.textContent = 'هنوز کسی امتیازی ثبت نکرده. اولین نفر تو باش!'; return; }
-    let i = 0;
-    snap.forEach(d => {
-      const v = d.data(); i++;
-      const row = document.createElement('div'); row.className = 'lbRow' + (d.id === uid ? ' me' : '');
+    if(!rows || !rows.length){ list.textContent = 'هنوز کسی امتیازی ثبت نکرده. اولین نفر تو باش!'; return; }
+    rows.forEach((v, idx) => {
+      const i = idx + 1;
+      const row = document.createElement('div'); row.className = 'lbRow' + (v.me ? ' me' : '');
       const b = document.createElement('b'); b.textContent = i <= 3 ? ['🥇','🥈','🥉'][i-1] : fa(i);
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = v.name;
       const sm = document.createElement('small'); sm.textContent = 'مرحله ' + fa(v.cleared);
@@ -771,7 +780,7 @@ el('lbBtn').onclick = () => { el('lbName').value = getName(); el('lbModal').clas
 el('lbClose').onclick = () => el('lbModal').classList.remove('open');
 el('lbSave').onclick = () => {
   const n = el('lbName').value.trim().slice(0, 16); if(!n) return;
-  localStorage.setItem('hbName', n); last = 0; submit(); setTimeout(load, 11800);
+  localStorage.setItem('hbName', n); submit(); setTimeout(load, 11800);
   el('lbSave').textContent = '✓ ذخیره شد'; setTimeout(() => el('lbSave').textContent = 'ذخیره', 1500);
 };
 window.LB = { submit };
