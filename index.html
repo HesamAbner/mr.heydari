@@ -2,291 +2,678 @@
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>بازی آقای حیدری</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
-  :root{ --amber:#f4a259; --red:#e63946; --cream:#f1faee; --line:#3a3f6b; }
-  *{box-sizing:border-box;}
+  :root{ --amber:#f4a259; --red:#e63946; --cream:#f1faee; --line:#3a3f6b; --panel:#12152e; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body{ margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    background:#0d0f22; font-family:'Vazirmatn',sans-serif; color:var(--cream); padding:20px; }
-  h1{font-size:1.3rem; margin:0 0 12px;}
-  .wrap{position:relative; width:min(92vw,640px);}
-  canvas{ width:100%; display:block; border:3px solid var(--line); border-radius:10px; touch-action:none; }
-  .hud{ position:absolute; top:10px; left:14px; right:14px; display:flex; justify-content:space-between;
-    font-family:'Press Start 2P',monospace; font-size:.6rem; color:var(--amber); pointer-events:none; }
-  .progress{ position:absolute; top:0; left:0; right:0; height:5px; background:rgba(255,255,255,.15); }
-  .progress i{ display:block; height:100%; background:var(--amber); width:0%; transition:width .15s; }
-  .banner{ position:absolute; top:50%; left:50%; transform:translate(-50%,-40%); opacity:0; text-align:center;
-    background:rgba(0,0,0,.55); color:#fff; padding:14px 22px; border-radius:10px; font-weight:700;
-    transition:all .25s ease; pointer-events:none; }
-  .banner.show{ opacity:1; transform:translate(-50%,-50%); pointer-events:all; }
-  .banner button{ margin-top:10px; }
-  .banner small{ display:block; margin-top:4px; font-weight:400; opacity:.8; }
-  .bar{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; justify-content:center; }
-  button{ font-family:'Vazirmatn',sans-serif; font-weight:700; cursor:pointer; border:none;
-    background:var(--amber); color:#1b1f3b; padding:9px 16px; border-radius:8px; font-size:.9rem; }
+    background:radial-gradient(circle at 50% 0%, #1a1f45, #0a0c1c 70%); font-family:'Vazirmatn',sans-serif; color:var(--cream);
+    padding:16px; user-select:none; -webkit-user-select:none; }
+  h1{ margin:0 0 10px; font-size:1.3rem; font-weight:900; letter-spacing:.3px; }
+  .stage{ position:relative; width:min(94vw,680px); }
+  .screen{ display:none; }
+  .screen.active{ display:block; }
+
+  /* ---------- world map ---------- */
+  #map{ border:3px solid var(--line); border-radius:16px; padding:14px; transition:background .5s; box-shadow:0 10px 40px rgba(0,0,0,.45); }
+  .mapTop{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:rgba(0,0,0,.38); border-radius:12px; padding:8px 10px; }
+  .mapTop h2{ margin:0; font-size:1.02rem; text-align:center; flex:1; }
+  .mini{ font-family:inherit; font-weight:700; cursor:pointer; border:2px solid rgba(255,255,255,.25); background:rgba(0,0,0,.25);
+    color:#fff; padding:6px 10px; border-radius:9px; font-size:.78rem; }
+  .mini:disabled{ opacity:.3; cursor:default; }
+  .track{ position:relative; height:220px; margin:10px 4px; }
+  .track svg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+  .node{ position:absolute; width:44px; height:44px; border-radius:50%; transform:translate(-50%,-50%); border:3px solid rgba(255,255,255,.35);
+    background:#222a55; color:#fff; font-weight:900; font-family:inherit; cursor:pointer; padding:0; display:flex; align-items:center;
+    justify-content:center; font-size:.95rem; box-shadow:0 4px 0 rgba(0,0,0,.35); }
+  .node.done{ background:#2a9d8f; border-color:#c8fff5; }
+  .node.cur{ background:var(--amber); color:#1b1f3b; border-color:#fff; animation:pulse 1.2s infinite; z-index:2; }
+  .node.locked{ background:#262a4a; color:#8b91c2; cursor:not-allowed; font-size:.85rem; }
+  .node.pop{ animation:pop .8s ease-out 3; z-index:3; }
+  @keyframes pulse{ 50%{ box-shadow:0 4px 0 rgba(0,0,0,.35), 0 0 0 11px rgba(244,162,89,.35); } }
+  @keyframes pop{ 0%{ transform:translate(-50%,-50%) scale(.2) rotate(-40deg); } 60%{ transform:translate(-50%,-50%) scale(1.55) rotate(8deg); } 100%{ transform:translate(-50%,-50%) scale(1); } }
+  .avatar{ position:absolute; bottom:40px; left:50%; width:36px; height:36px; transform:translateX(-50%); border-radius:50%;
+    border:2px solid #fff; object-fit:cover; background:#e8b98a; animation:hop .6s infinite alternate ease-in-out; pointer-events:none; }
+  @keyframes hop{ to{ transform:translateX(-50%) translateY(-8px); } }
+  .mapBottom{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; background:rgba(0,0,0,.38); border-radius:12px; padding:8px 10px; }
+  #mapInfo{ font-size:.82rem; font-weight:700; }
+
+  /* ---------- game ---------- */
+  .cwrap{ position:relative; }
+  canvas{ width:100%; display:block; border:3px solid var(--line); border-radius:12px; touch-action:none; background:#0d0f22; }
+  .hud{ position:absolute; top:12px; left:14px; right:14px; display:flex; justify-content:space-between; font-weight:900; font-size:.85rem;
+    color:#fff; text-shadow:0 2px 4px rgba(0,0,0,.7); pointer-events:none; }
+  .progress{ position:absolute; top:0; left:0; right:0; height:6px; background:rgba(255,255,255,.18); border-radius:10px 10px 0 0; overflow:hidden; }
+  .progress i{ display:block; height:100%; width:0; background:linear-gradient(90deg,#f4a259,#ffd166); }
+  .banner{ position:absolute; top:34px; left:50%; transform:translate(-50%,-14px); opacity:0; pointer-events:none; text-align:center;
+    background:var(--red); color:#fff; padding:10px 18px 12px; border-radius:12px; font-weight:900; font-size:1.05rem;
+    transition:all .25s ease; box-shadow:0 8px 24px rgba(0,0,0,.5); min-width:220px; }
+  .banner.show{ opacity:1; transform:translate(-50%,0); pointer-events:all; }
+  .banner small{ display:block; margin-top:2px; font-weight:400; opacity:.9; font-size:.78rem; }
+  .bbar{ display:flex; gap:8px; justify-content:center; margin-top:8px; }
+  .bar{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; justify-content:center; align-items:center; }
+  .chips{ font-size:.75rem; opacity:.8; display:flex; gap:6px; align-items:center; }
+  .key{ border:1px solid rgba(255,255,255,.4); border-bottom-width:3px; border-radius:6px; padding:1px 8px; font-weight:700; background:rgba(255,255,255,.08); }
+
+  button{ font-family:'Vazirmatn',sans-serif; font-weight:700; cursor:pointer; border:none; background:var(--amber); color:#1b1f3b;
+    padding:9px 16px; border-radius:9px; font-size:.9rem; }
   button.ghost{ background:transparent; border:2px solid var(--line); color:var(--cream); }
+  button.danger{ border-color:#7a2b33; color:#ff8b95; }
   button:active{ transform:translateY(1px); }
-  .hint{ margin-top:8px; font-size:.75rem; opacity:.65; text-align:center; }
-  .modal{ position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:5; }
+
+  #toast{ position:absolute; top:10px; left:50%; transform:translate(-50%,-70px); background:#0b0e24; border:2px solid var(--amber); color:#fff;
+    padding:10px 18px; border-radius:12px; font-weight:900; z-index:8; transition:transform .35s cubic-bezier(.2,1.4,.4,1); white-space:nowrap;
+    max-width:94vw; overflow:hidden; text-overflow:ellipsis; box-shadow:0 8px 24px rgba(0,0,0,.5); }
+  #toast.show{ transform:translate(-50%,0); }
+
+  .modal{ position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; z-index:20; }
   .modal.open{ display:flex; }
-  .panel{ background:#0d0f22; border:2px solid var(--line); border-radius:12px; padding:22px 24px; width:min(90vw,340px); }
-  .row{ margin:14px 0; display:flex; flex-direction:column; gap:6px; }
+  .panel{ background:var(--panel); border:2px solid var(--line); border-radius:14px; padding:20px 22px; width:min(92vw,360px); max-height:92vh; overflow:auto; }
+  .panel h2{ margin:0 0 6px; font-size:1.15rem; }
+  .row{ margin:12px 0; display:flex; flex-direction:column; gap:6px; font-size:.9rem; }
   select, input[type=range]{ width:100%; }
+  select{ font-family:inherit; padding:6px; border-radius:8px; background:#0b0e24; color:#fff; border:2px solid var(--line); }
 </style>
 </head>
 <body>
 <h1>🏙️ آقای حیدری در شهر</h1>
-<div class="wrap">
-  <div class="progress"><i id="prog"></i></div>
-  <canvas id="game" width="640" height="220"></canvas>
-  <div class="hud"><span id="lvl">مرحله ۱</span><span id="score">۰۰۰۰</span><span id="best">رکورد: ۰</span></div>
-  <div class="banner" id="banner">
-    <span id="bannerText">آقای حیدری کشته شد</span>
-    <small id="bannerSub"></small>
-    <div><button id="retryBtn">🔁 شروع دوباره</button></div>
+
+<div class="stage">
+  <div id="toast"></div>
+
+  <!-- ===== نقشه مرحله‌ها ===== -->
+  <div id="map" class="screen active">
+    <div class="mapTop">
+      <button class="mini" id="prevWorld">▶ دنیای قبل</button>
+      <h2 id="worldName"></h2>
+      <button class="mini" id="nextWorld">دنیای بعد ◀</button>
+    </div>
+    <div class="track" id="track"></div>
+    <div class="mapBottom">
+      <span id="mapInfo"></span>
+      <div style="display:flex;gap:8px">
+        <button class="ghost" id="mapSettings">⚙ تنظیمات</button>
+        <button id="continueBtn">▶ ادامه</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== خود بازی ===== -->
+  <div id="gameScreen" class="screen">
+    <div class="cwrap">
+      <div class="progress"><i id="prog"></i></div>
+      <canvas id="game" width="640" height="230"></canvas>
+      <div class="hud"><span id="lvl"></span><span id="score"></span></div>
+      <div class="banner" id="banner">
+        <span>آقای حیدری کشته شد</span>
+        <small id="bannerSub"></small>
+        <div class="bbar">
+          <button id="retryBtn">🔁 دوباره</button>
+          <button class="ghost" id="bannerMap">🗺 نقشه</button>
+        </div>
+      </div>
+    </div>
+    <div class="bar">
+      <button class="ghost" id="menuBtn">☰ منو</button>
+      <div class="chips"><span class="key">Space</span> یا لمس = پرش <span class="key">Esc</span> = منو</div>
+    </div>
   </div>
 </div>
-<div class="bar">
-  <button id="pauseBtn">⏸ توقف</button>
-  <button class="ghost" id="settingsBtn">⚙ تنظیمات</button>
-  <button class="ghost" id="downloadBtn">⭳ دانلود بازی</button>
-</div>
 
+<!-- ===== منوی یکپارچه: توقف + تنظیمات ===== -->
 <div class="modal" id="modal">
   <div class="panel">
-    <h2>تنظیمات</h2>
-    <div class="row"><label>صدا</label><input type="range" id="volume" min="0" max="100" value="60"></div>
-    <div class="row"><label>سطح سختی</label>
-      <select id="difficulty"><option value="0.85">آسان</option><option value="1" selected>عادی</option><option value="1.35">سخت</option></select>
+    <h2>منو و تنظیمات</h2>
+    <div class="bar" id="gameOnly" style="margin-top:8px">
+      <button id="resumeBtn">▶ ادامه بازی</button>
+      <button class="ghost" id="toMapBtn">🗺 نقشه مرحله‌ها</button>
     </div>
-    <div class="row"><label><input type="checkbox" id="graphics" checked> جزئیات گرافیکی</label></div>
+    <div class="row"><label>🔊 صدا</label><input type="range" id="volume" min="0" max="100" value="60"></div>
+    <div class="row"><label>🎚 سطح سختی</label>
+      <select id="difficulty"><option value="0.85">آسان</option><option value="1" selected>عادی</option><option value="1.3">سخت</option></select>
+    </div>
+    <div class="row"><label><input type="checkbox" id="graphics" checked> ✨ جزئیات گرافیکی (پنجره، آب‌وهوا، ستاره)</label></div>
     <div class="bar">
-      <button id="closeSettings">تایید</button>
-      <button class="ghost" id="resetProgress">شروع از مرحله ۱</button>
+      <button class="ghost" id="downloadBtn">⭳ دانلود بازی</button>
+      <button class="ghost danger" id="resetBtn">🗑 شروع از اول</button>
     </div>
+    <div class="bar"><button id="closeMenu">بستن</button></div>
   </div>
 </div>
 
 <script>
-const cv=document.getElementById('game'), ctx=cv.getContext('2d');
-const scoreEl=document.getElementById('score'), lvlEl=document.getElementById('lvl'), bestEl=document.getElementById('best');
-const banner=document.getElementById('banner'), bannerText=document.getElementById('bannerText'), bannerSub=document.getElementById('bannerSub');
-const prog=document.getElementById('prog');
-const toFa = n => String(n).replace(/\d/g, d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+const $ = id => document.getElementById(id);
+const cv = $('game'), ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const toFa = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const hash = n => { const s = Math.sin(n*127.1 + 311.7)*43758.5453; return s - Math.floor(s); };
+const worldOf = L => Math.floor((L-1)/10);
 
-const face=new Image(); let faceLoaded=false;
-face.onload=()=>faceLoaded=true; face.src='face.png';
+/* ---------------- ذخیره‌سازی ---------------- */
+const store = {
+  get(k,d){ try{ const v = localStorage.getItem(k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+let unlocked = clamp(Number(store.get('hbLevel',1)) || 1, 1, 101);
+let best = Number(store.get('hbBest',0)) || 0;
+const settings = store.get('hbSet', {vol:60, diff:1, gfx:true});
+$('volume').value = settings.vol; $('difficulty').value = String(settings.diff); $('graphics').checked = !!settings.gfx;
+function saveSettings(){ store.set('hbSet', {vol:Number($('volume').value), diff:Number($('difficulty').value), gfx:$('graphics').checked}); }
+['volume','difficulty','graphics'].forEach(id => $(id).addEventListener('input', saveSettings));
+const gfxOn = () => $('graphics').checked;
 
-let audioCtx;
-function beep(freq,dur,type='square'){
-  if(document.getElementById('volume').value==0) return;
-  audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-  o.type=type; o.frequency.value=freq; g.gain.value=document.getElementById('volume').value/100*0.2;
-  o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+dur);
+/* ---------------- تصویر صورت ---------------- */
+const face = new Image(); let faceOK = false;
+face.onload = () => faceOK = true;
+face.src = 'face.png';
+
+/* ---------------- صدا (آرکید ۸بیتی) ---------------- */
+let ac;
+function AC(){ ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if(ac.state === 'suspended') ac.resume(); return ac; }
+const vol = () => Number($('volume').value)/100;
+function tone(f, d, type='square', v=1, delay=0, slideTo){
+  if(vol() === 0) return;
+  const a = AC(), t = a.currentTime + delay;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + d);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, 0.18*vol()*v), t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + d + 0.03);
 }
-// old-school arcade background loop
-const MELODY=[392,392,523,392,440,392,349,392];
-let musicTimer=null, noteIdx=0;
-function startMusic(){ if(musicTimer) return; musicTimer=setInterval(()=>{ beep(MELODY[noteIdx%MELODY.length],0.15,'square'); noteIdx++; },200); }
-function stopMusic(){ clearInterval(musicTimer); musicTimer=null; }
+const sfx = {
+  jump(){ tone(330,.16,'square',1,0,720); },
+  die(){ [400,340,280,200,120].forEach((f,i) => tone(f,.16,'sawtooth',1,i*.11)); },
+  poof(){ tone(200,.45,'sawtooth',.9,0,45); tone(90,.4,'square',.7,.05,40); },
+  win(){ [523,659,784,1047].forEach((f,i) => tone(f,.14,'square',1,.35+i*.09)); },
+  unlock(){ [659,784,988,1319,1568].forEach((f,i) => tone(f,.17,'triangle',1,i*.1)); },
+  click(){ tone(600,.05,'square',.6); }
+};
+const MEL = [523,0,659,0,784,659,523,0, 587,0,698,0,880,698,587,0, 523,659,784,1047,784,659,523,0, 392,0,494,0,587,494,392,0];
+const BASS = [131,131,196,196,147,147,220,220];
+let mT = null, mi = 0;
+function startMusic(){
+  if(mT) return;
+  mT = setInterval(() => {
+    const n = MEL[mi % MEL.length];
+    if(n) tone(n, .12, 'square', .45);
+    if(mi % 4 === 0) tone(BASS[(mi>>2) % BASS.length], .3, 'triangle', .9);
+    mi++;
+  }, 150);
+}
+function stopMusic(){ clearInterval(mT); mT = null; }
 
-// worlds: cycle every 10 levels
-const WORLDS=[
-  {sky1:'#1b1f3b',sky2:'#0d0f22',building:'#2a2f55',window:'#f4a259',road:'#232750'},
-  {sky1:'#3b1b2f',sky2:'#1a0d16',building:'#552a44',window:'#ffd166',road:'#2a1522'},
-  {sky1:'#123a2e',sky2:'#081b16',building:'#1f5c47',window:'#a0e8af',road:'#0e2a21'},
-  {sky1:'#2b2140',sky2:'#140f24',building:'#4a3a78',window:'#ff9ecf',road:'#1c1530'},
-  {sky1:'#3a2410',sky2:'#1a0f06',building:'#6b4423',window:'#ffe08a',road:'#241505'},
+/* ---------------- دنیاها (هر ۱۰ مرحله یک شهر) ---------------- */
+const WORLDS = [
+  {name:'شهر شبانه',   s1:'#1b1f3b', s2:'#0d0f22', b1:'#181d3d', b2:'#262d5c', win:'#f4c56a', road:'#191c3a', curb:'#3a3f6b', orb:'#e9e6c9', wx:0, nt:1},
+  {name:'شهر غروب',    s1:'#ff9966', s2:'#5b3a6b', b1:'#4a2f52', b2:'#6b3f5e', win:'#ffe08a', road:'#2c2136', curb:'#7a5670', orb:'#ffd166', wx:0, nt:0},
+  {name:'شهر نئونی',   s1:'#2b0f4d', s2:'#0b0420', b1:'#2f1060', b2:'#4d1a88', win:'#ff4fd8', road:'#12061f', curb:'#5a1f9c', orb:'#4ff0ff', wx:0, nt:1},
+  {name:'شهر بارانی',  s1:'#3c4a5e', s2:'#161c26', b1:'#263141', b2:'#374459', win:'#d9e7ff', road:'#10151d', curb:'#4b586b', orb:'#9fb3c8', wx:1, nt:0},
+  {name:'شهر پاییزی',  s1:'#f2b56b', s2:'#7a3e1d', b1:'#6b3a1f', b2:'#8a4b26', win:'#fff0b3', road:'#2a180d', curb:'#a86a3a', orb:'#ffe4a3', wx:0, nt:0},
+  {name:'شهر برفی',    s1:'#a9c7e8', s2:'#e8f1fa', b1:'#7f9bbd', b2:'#9db6d3', win:'#fff7c2', road:'#5c6f86', curb:'#dbe7f5', orb:'#ffffff', wx:2, nt:0},
+  {name:'شهر صنعتی',   s1:'#4a4f57', s2:'#1f2226', b1:'#33373d', b2:'#464b53', win:'#ff9b3d', road:'#15171a', curb:'#5b616b', orb:'#c9c9c9', wx:0, nt:0},
+  {name:'شهر ساحلی',   s1:'#5ec7ff', s2:'#d8f3ff', b1:'#2aa1b8', b2:'#57c1d1', win:'#ffffff', road:'#5a5f66', curb:'#f0e3b5', orb:'#fff3a0', wx:0, nt:0},
+  {name:'شهر بیابانی', s1:'#ffcc70', s2:'#c8763a', b1:'#a4622f', b2:'#c07d3f', win:'#3a2412', road:'#5a3a22', curb:'#d9a05a', orb:'#fff2c2', wx:0, nt:0},
+  {name:'شهر آینده',   s1:'#06162e', s2:'#0a3a5c', b1:'#0d3b66', b2:'#1568a3', win:'#7dffea', road:'#06121f', curb:'#1568a3', orb:'#8bf5ff', wx:0, nt:1},
 ];
-function worldFor(level){ return WORLDS[Math.floor((level-1)/10) % WORLDS.length]; }
+const BASE = 192;      // خط پایین ساختمان‌ها
+const GROUND = 210;    // جای پای شخصیت
+const CAR_BASE = 208;  // پایین ماشین‌ها
+const PX = 84;         // مکان افقی آقای حیدری
+const GRAV = 0.9, JUMP_V = -14.5, STU_V = 3.6;
 
-let best=Number(localStorage.getItem('hbBest')||0);
-let unlocked=Number(localStorage.getItem('hbLevel')||1);
-bestEl.textContent='رکورد: '+toFa(best);
+let curWorld = 0, layers = null, skyGrad = null, skyStars = [], drops = [], scrollX = 0;
+function makeLayer(seed, minH, maxH, minW, maxW, count){
+  const items = []; let x = 0;
+  for(let i=0;i<count;i++){
+    const w = minW + hash(seed+i*3)*(maxW-minW), h = minH + hash(seed+i*7+1)*(maxH-minH);
+    items.push({x, w, h, roof:hash(seed+i*11)}); x += w + hash(seed+i*5)*5;
+  }
+  return {items, total:x};
+}
+function buildWorld(wi){
+  curWorld = wi; const w = WORLDS[wi];
+  layers = [ makeLayer(wi*100+1, 70, 130, 34, 60, 18), makeLayer(wi*100+50, 48, 108, 40, 72, 16) ];
+  skyGrad = ctx.createLinearGradient(0,0,0,H); skyGrad.addColorStop(0,w.s1); skyGrad.addColorStop(1,w.s2);
+  skyStars = []; for(let i=0;i<34;i++) skyStars.push({x:hash(wi*50+i)*W, y:hash(wi*70+i*3)*110, r:.6+hash(i*9+wi)*1.3});
+  drops = []; for(let i=0;i<70;i++) drops.push({x:Math.random()*W, y:Math.random()*H, v:2+Math.random()*3, s:Math.random()});
+}
 
-let dust=[];
-function spawnDust(x,y){ for(let i=0;i<24;i++) dust.push({x,y,vx:(Math.random()-.5)*6,vy:(Math.random()-.5)*4-2,life:30+Math.random()*15}); }
-
-let state;
+/* ---------------- حالت بازی ---------------- */
+let screen = 'map', state = null, mapWorld = 0, modalOpen = false, pausedByMenu = false;
 function freshState(level){
-  return { level, paused:false, dead:false, cleared:false, gravity:0.9, speed:6,
-    playerY:170, vy:0, jumping:false, playerX:60, playerSize:40, legPhase:0,
-    obstacles:[], frame:0, score:0, target:260+level*45, groundOffset:0,
-    student:null, studentSpawned:false };
+  return { level, phase:'play', paused:false, speed:6, y:GROUND, vy:0, air:false, legPhase:0,
+    obstacles:[], sinceCar:0, gap:380, score:0, target:200+level*25,
+    student:null, studentSpawned:false, cloud:null, cloudT:0, pop:null, dizzy:0 };
 }
-function newRun(level){ state=freshState(level); banner.classList.remove('show'); }
-newRun(unlocked);
+function newRun(level){ state = freshState(level); scrollX = 0; $('banner').classList.remove('show'); }
 
-function spawnObstacle(){
-  const w=46+Math.random()*24, h=26+Math.random()*8;
-  state.obstacles.push({x:cv.width+10, y:170+38-h, w, h, color: Math.random()<.5 ? '#e63946':'#457b9d'});
+function spawnCar(){
+  const cols = ['#e63946','#457b9d','#f4a261','#2a9d8f','#e9c46a','#8d99ae','#9b5de5','#f1faee'];
+  state.obstacles.push({ x:W+30, w:60+Math.random()*24, bh:15+Math.random()*3, ch:10+Math.random()*3, color:cols[Math.floor(Math.random()*cols.length)] });
 }
 
-function jump(){
-  if(state.dead || state.cleared){ newRun(state.dead? unlocked : state.level+1); return; }
-  if(!state.jumping && !state.paused){ state.jumping=true; state.vy=-14.5; beep(520,.08); }
+function act(){
+  if(screen !== 'game' || modalOpen) return;
+  const s = state;
+  if(s.phase === 'dead'){ restart(); return; }
+  if(s.phase === 'play' && !s.paused && !s.air){ s.air = true; s.vy = JUMP_V; sfx.jump(); }
 }
-document.addEventListener('keydown', e=>{ if(e.code==='Space'){ e.preventDefault(); jump(); }});
-cv.addEventListener('pointerdown', jump);
-document.getElementById('retryBtn').onclick = jump;
+function restart(){ newRun(state.level); }
 
-function loop(){
-  requestAnimationFrame(loop);
-  lvlEl.textContent='مرحله '+toFa(state.level);
-  prog.style.width = Math.min(100, state.score/state.target*100)+'%';
+function die(){
+  const s = state; s.phase = 'dead'; s.dizzy = 0; sfx.die();
+  best = Math.max(best, Math.floor(s.score)); store.set('hbBest', best);
+  $('bannerSub').textContent = 'امتیاز: ' + toFa(Math.floor(s.score)) + ' — رکورد: ' + toFa(best);
+  $('banner').classList.add('show');
+}
 
-  const running = !(state.dead || state.cleared || state.paused);
-  if(running) startMusic(); else stopMusic();
+function makeCloud(x, y){
+  const puffs = [];
+  for(let i=0;i<34;i++) puffs.push({a:Math.random()*6.283, d:Math.random()*30, r:9+Math.random()*13, sp:(Math.random()-.5)*.22, g:Math.floor(175+Math.random()*70), ph:Math.random()*6});
+  const stars = [];
+  for(let i=0;i<7;i++) stars.push({a:Math.random()*6.283, d:22+Math.random()*32, sp:(Math.random()<.5?-1:1)*(.08+Math.random()*.1), r:4+Math.random()*4});
+  return {x, y, puffs, stars};
+}
 
-  if(state.dead || state.cleared){ draw(); return; }
-  if(state.paused){ draw(); return; }
-
-  state.frame++;
-  const diff=Number(document.getElementById('difficulty').value);
-  state.speed=(6+state.score/320)*diff;
-  state.groundOffset=(state.groundOffset+state.speed)%24;
-
-  if(state.jumping){
-    state.vy+=state.gravity; state.playerY+=state.vy;
-    if(state.playerY>=170){ state.playerY=170; state.jumping=false; state.vy=0; }
-  } else { state.legPhase += state.speed*0.05; }
-
-  if(state.frame % Math.max(38, 85-state.level) === 0) spawnObstacle();
-  state.obstacles.forEach(o=>o.x-=state.speed);
-  state.obstacles=state.obstacles.filter(o=>o.x>-40);
-
-  if(!state.studentSpawned && state.score>=state.target-70){
-    state.studentSpawned=true;
-    state.student={x:cv.width+30, y:170+6, w:26, h:34};
+function catchStudent(){
+  const s = state, st = s.student;
+  s.phase = 'cloud'; s.cloudT = 0;
+  s.cloud = makeCloud((PX + st.x)/2, GROUND - 26);
+  sfx.poof(); sfx.win();
+  if(s.level >= unlocked){
+    unlocked = Math.min(101, s.level + 1); store.set('hbLevel', unlocked);
+    s.pop = s.level < 100 ? s.level + 1 : null;
   }
-  if(state.student) state.student.x -= state.speed;
+}
 
-  for(const o of state.obstacles){
-    if(state.playerX+30>o.x && state.playerX+8<o.x+o.w && state.playerY+state.playerSize-8>o.y){
-      state.dead=true; beep(120,.4,'sawtooth');
-      bannerText.textContent='آقای حیدری کشته شد';
-      bannerSub.textContent='امتیاز: '+toFa(Math.floor(state.score))+' — دوباره تلاش کن';
-      best=Math.max(best,Math.floor(state.score)); localStorage.setItem('hbBest',best);
-      bestEl.textContent='رکورد: '+toFa(best);
-      banner.classList.add('show');
+/* ---------------- به‌روزرسانی ---------------- */
+function update(dt){
+  const s = state;
+  if(s.phase === 'cloud'){
+    s.cloudT += dt;
+    if(s.cloudT >= 110) showMap(s.pop, s.level);
+    return;
+  }
+  if(s.phase === 'dead'){ s.dizzy += dt; return; }
+
+  const diff = Number($('difficulty').value);
+  s.speed = (5.2 + s.level*0.05 + s.score/450) * diff;
+  scrollX += s.speed*dt;
+  if(s.air){
+    s.vy += GRAV*dt; s.y += s.vy*dt;
+    if(s.y >= GROUND){ s.y = GROUND; s.air = false; s.vy = 0; }
+  } else s.legPhase += s.speed*0.075*dt;
+
+  if(!s.studentSpawned){
+    s.sinceCar += s.speed*1.15*dt;
+    if(s.sinceCar >= s.gap){
+      spawnCar(); s.sinceCar = 0;
+      s.gap = Math.max(210, 330 + Math.random()*230 - s.level*1.3);
     }
   }
-  if(!state.dead){
-    state.score+=0.5;
-    scoreEl.textContent=toFa(String(Math.floor(state.score)).padStart(4,'0'));
-    const s=state.student;
-    if(s && state.playerX+30>s.x && state.playerX+8<s.x+s.w){
-      state.cleared=true; spawnDust(s.x+s.w/2, s.y+s.h/2); beep(700,.15,'sine');
-      unlocked=Math.max(unlocked, state.level+1); localStorage.setItem('hbLevel',unlocked);
-      bannerText.textContent='مرحله '+toFa(state.level)+' تموم شد!';
-      bannerSub.textContent = state.level%10===0 ? 'شهر عوض شد — مرحله بعد' : 'برای ادامه بزن';
-      banner.classList.add('show');
-    }
+  s.obstacles.forEach(o => o.x -= s.speed*1.15*dt);
+  s.obstacles = s.obstacles.filter(o => o.x > -110);
+
+  for(const o of s.obstacles){
+    if(PX+9 > o.x+4 && PX-9 < o.x+o.w-4 && s.y-4 > CAR_BASE-(o.bh+o.ch)+3){ die(); return; }
   }
-  dust.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.15; p.life--; });
-  dust=dust.filter(p=>p.life>0);
-  draw();
+
+  s.score += 0.5*dt;
+
+  if(!s.studentSpawned && s.score >= s.target - 60){
+    s.studentSpawned = true;
+    s.student = {x:W+50, ph:0};
+  }
+  if(s.student){
+    const st = s.student;
+    st.x -= (s.speed - STU_V)*dt; st.ph += STU_V*0.11*dt;
+    if(PX+10 > st.x-6 && PX-10 < st.x+6) catchStudent();
+  }
 }
 
-function drawLeg(hipX,hipY,ang,len){
-  ctx.save(); ctx.translate(hipX,hipY); ctx.rotate(ang);
-  ctx.fillStyle='#3b5aa6'; ctx.fillRect(-4,0,8,len);
+/* ---------------- رسم انسان (طبیعی، با حرکت دقیق پا) ---------------- */
+function rr(x,y,w,h,r){
+  ctx.beginPath(); ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function limb(len, w, color){ ctx.fillStyle = color; rr(-w/2, -1, w, len+1, w/2.2); ctx.fill(); }
+
+function drawHuman(o){
+  const shoeH = 3, thL = o.legH*0.5, shL = o.legH*0.5;
+  const running = !o.air && !o.still;
+  const bob = running ? -Math.abs(Math.sin(o.phase))*1.6 : 0;
+  const hipY = o.feet - shoeH - o.legH + bob;
+  const torsoTop = hipY - o.torsoH;
+  const headCy = torsoTop - 2 - o.hr + (running ? Math.sin(o.phase*2)*0.6 : 0);
+  const p = o.phase;
+
+  const A = {th:-Math.sin(p)*0.85, bend:0.15+Math.max(0,Math.cos(p))*1.05};
+  const B = {th:-Math.sin(p+Math.PI)*0.85, bend:0.15+Math.max(0,Math.cos(p+Math.PI))*1.05};
+  if(o.air){ A.th = -1.0; A.bend = 1.3; B.th = 0.55; B.bend = 0.5; }
+  if(o.still){ A.th = 0.05; A.bend = 0.05; B.th = -0.05; B.bend = 0.05; }
+
+  const legW = o.torsoW*0.42;
+  const drawLeg = (L, dx) => {
+    ctx.save(); ctx.translate(dx, hipY-1); ctx.rotate(L.th);
+    limb(thL, legW, o.pants);
+    ctx.translate(0, thL-1); ctx.rotate(L.bend);
+    limb(shL+1, legW*0.92, o.pants);
+    ctx.fillStyle = o.shoe; rr(-legW*0.45, shL-2, legW*1.55, 4, 2); ctx.fill();
+    ctx.restore();
+  };
+  const armW = Math.max(3, o.torsoW*0.25), uL = o.arm*0.55, fL = o.arm*0.45;
+  const drawArm = (th, bend, dx) => {
+    ctx.save(); ctx.translate(dx, torsoTop+3); ctx.rotate(th);
+    limb(uL, armW, o.sleeve || o.shirt);
+    ctx.translate(0, uL-1); ctx.rotate(bend);
+    limb(fL+1, armW*0.9, o.skin);
+    ctx.restore();
+  };
+  const armX = o.air ? -2.4 : Math.sin(p)*0.8;
+  const armY = o.air ? -2.1 : -Math.sin(p)*0.8;
+
+  ctx.save(); ctx.translate(o.x, 0);
+  // پشت: پای عقب، دست عقب، کوله
+  drawLeg(B, -o.torsoW*0.12);
+  drawArm(armX, -0.6, 0);
+  if(o.pack){ ctx.fillStyle = o.pack; rr(-o.torsoW/2-5, torsoTop+2, 8, o.torsoH*0.78, 3); ctx.fill(); }
+
+  // تنه
+  ctx.fillStyle = o.shirt; rr(-o.torsoW/2, torsoTop, o.torsoW, o.torsoH+2, 3); ctx.fill();
+  if(o.checker){
+    ctx.save(); rr(-o.torsoW/2, torsoTop, o.torsoW, o.torsoH+2, 3); ctx.clip();
+    ctx.fillStyle = o.checker; const c = 4;
+    for(let yy=0; yy<o.torsoH+2; yy+=c) for(let xx=0; xx<o.torsoW; xx+=c)
+      if((((xx/c)|0)+((yy/c)|0)) % 2 === 0) ctx.fillRect(-o.torsoW/2+xx, torsoTop+yy, c, c);
+    ctx.restore();
+  }
+  if(o.tie){ ctx.fillStyle = o.tie; ctx.fillRect(o.torsoW*0.05, torsoTop+1, 3, o.torsoH*0.6); }
+  ctx.fillStyle = o.belt || '#222'; ctx.fillRect(-o.torsoW/2, hipY-2, o.torsoW, 2.5);
+
+  // جلو: پای جلو، دست جلو
+  drawLeg(A, o.torsoW*0.12);
+  drawArm(armY, -0.6, 0);
+
+  // گردن و سر
+  ctx.fillStyle = o.skin; ctx.fillRect(-2.5, torsoTop-3, 5, 4);
+  if(o.faceImg){
+    ctx.save(); ctx.beginPath(); ctx.arc(0, headCy, o.hr, 0, 6.283); ctx.clip();
+    ctx.drawImage(o.faceImg, -o.hr, headCy-o.hr, o.hr*2, o.hr*2); ctx.restore();
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(0, headCy, o.hr, 0, 6.283); ctx.stroke();
+  } else {
+    ctx.fillStyle = o.skin; ctx.beginPath(); ctx.arc(0, headCy, o.hr, 0, 6.283); ctx.fill();
+    ctx.fillStyle = o.hair || '#222'; ctx.beginPath(); ctx.arc(0, headCy-0.5, o.hr+0.6, Math.PI*1.05, Math.PI*1.98); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(o.hr*0.38, headCy+o.hr*0.05, Math.max(1, o.hr*0.11), 0, 6.283); ctx.fill();
+    ctx.strokeStyle = '#7a3f2a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(o.hr*0.3, headCy+o.hr*0.4, o.hr*0.22, 0.2, 1.6); ctx.stroke();
+  }
   ctx.restore();
 }
-function drawPlayer(){
-  const x=state.playerX, y=state.playerY, s=state.playerSize;
-  const hipY=s*0.55, legLen=s*0.5;
-  let legA1, legA2;
-  if(state.jumping){ legA1=-0.4; legA2=-0.15; }
-  else { legA1=Math.sin(state.legPhase)*0.55; legA2=Math.sin(state.legPhase+Math.PI)*0.55; }
-  ctx.save(); ctx.translate(x,y);
-  drawLeg(s*0.32, hipY, legA1, legLen);
-  drawLeg(s*0.62, hipY, legA2, legLen);
-  // torso: checkered shirt (4-square pattern)
-  const tw=s*0.62, th=s*0.4, tx=s*0.19, ty=s*0.18;
-  const cols=['#c1121f','#f1faee'];
-  for(let r=0;r<2;r++) for(let c=0;c<2;c++){
-    ctx.fillStyle=cols[(r+c)%2];
-    ctx.fillRect(tx+c*tw/2, ty+r*th/2, tw/2, th/2);
-  }
-  // arms
-  ctx.strokeStyle='#c1121f'; ctx.lineWidth=5; ctx.lineCap='round';
-  ctx.beginPath(); ctx.moveTo(tx,ty+6); ctx.lineTo(tx-8, ty+th*0.9); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(tx+tw,ty+6); ctx.lineTo(tx+tw+8, ty+th*0.9); ctx.stroke();
-  // head — enlarged so the face reads clearly
-  const hx=s*0.5, hy=-s*0.1, hr=s*0.34;
-  if(faceLoaded){ ctx.drawImage(face, hx-hr, hy, hr*2, hr*2); }
-  else { ctx.fillStyle='#e8b98a'; ctx.beginPath(); ctx.arc(hx,hy+hr,hr,0,Math.PI*2); ctx.fill(); }
-  ctx.restore();
+
+const PLAYER = { hr:13, torsoH:16, torsoW:20, legH:22, arm:16, skin:'#e0ac82', shirt:'#3a5a9c', checker:'#f4f6fb',
+                 pants:'#2f4f8f', shoe:'#2a2a2a', belt:'#1b2a55' };
+const STUDENT = { hr:8, torsoH:15, torsoW:14, legH:21, arm:14, skin:'#f0c9a0', hair:'#2b1d14', shirt:'#f4f4f6', sleeve:'#f4f4f6',
+                  tie:'#1d3557', pants:'#243b6b', shoe:'#3a2a20', pack:'#e07a1f', belt:'#111' };
+
+function star(x, y, r, c){
+  ctx.fillStyle = c; ctx.beginPath();
+  for(let i=0;i<10;i++){ const a = -Math.PI/2 + i*Math.PI/5, rad = i%2 ? r*0.45 : r; ctx.lineTo(x+Math.cos(a)*rad, y+Math.sin(a)*rad); }
+  ctx.closePath(); ctx.fill();
 }
 
-function draw(){
-  const w=worldFor(state.level);
-  ctx.clearRect(0,0,cv.width,cv.height);
-  const g=ctx.createLinearGradient(0,0,0,cv.height); g.addColorStop(0,w.sky1); g.addColorStop(1,w.sky2);
-  ctx.fillStyle=g; ctx.fillRect(0,0,cv.width,cv.height);
-
-  if(document.getElementById('graphics').checked){
-    ctx.fillStyle=w.building;
-    for(let i=0;i<9;i++){
-      const bw=40+((i*53)%40), bx=(i*90 - state.groundOffset*0.4)%(cv.width+90)-90, bh=60+((i*37)%70);
-      ctx.fillRect(bx, 150-bh, bw, bh);
-      ctx.fillStyle=w.window;
-      for(let wy=150-bh+8; wy<140; wy+=14) for(let wx=bx+6; wx<bx+bw-6; wx+=14) ctx.fillRect(wx,wy,6,8);
-      ctx.fillStyle=w.building;
-    }
-  }
-  ctx.fillStyle=w.road; ctx.fillRect(0,196,cv.width,24);
-  ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.setLineDash([16,10]);
-  ctx.beginPath(); ctx.moveTo(-state.groundOffset,208); ctx.lineTo(cv.width,208); ctx.stroke(); ctx.setLineDash([]);
-
-  // cars
-  state.obstacles.forEach(o=>{
-    ctx.fillStyle=o.color; ctx.fillRect(o.x,o.y,o.w,o.h*0.7);
-    ctx.fillRect(o.x+o.w*0.2,o.y-o.h*0.35,o.w*0.6,o.h*0.4);
-    ctx.fillStyle='#1b1f3b'; ctx.beginPath(); ctx.arc(o.x+o.w*0.22,o.y+o.h*0.7,5,0,Math.PI*2);
-    ctx.arc(o.x+o.w*0.78,o.y+o.h*0.7,5,0,Math.PI*2); ctx.fill();
+function drawCar(o){
+  const y = CAR_BASE - o.bh;
+  ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(o.x+o.w/2, CAR_BASE+3, o.w*0.52, 3, 0, 0, 6.283); ctx.fill();
+  ctx.fillStyle = o.color; rr(o.x, y, o.w, o.bh-1, 4); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,.2)';
+  ctx.beginPath(); ctx.moveTo(o.x+o.w*0.2, y); ctx.lineTo(o.x+o.w*0.31, y-o.ch); ctx.lineTo(o.x+o.w*0.72, y-o.ch); ctx.lineTo(o.x+o.w*0.84, y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = o.color; ctx.beginPath();
+  ctx.moveTo(o.x+o.w*0.2, y+1); ctx.lineTo(o.x+o.w*0.31, y-o.ch); ctx.lineTo(o.x+o.w*0.72, y-o.ch); ctx.lineTo(o.x+o.w*0.84, y+1); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#bfe6ff'; ctx.beginPath();
+  ctx.moveTo(o.x+o.w*0.25, y-1); ctx.lineTo(o.x+o.w*0.34, y-o.ch+2.5); ctx.lineTo(o.x+o.w*0.69, y-o.ch+2.5); ctx.lineTo(o.x+o.w*0.79, y-1); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = o.color; ctx.fillRect(o.x+o.w*0.52, y-o.ch+2, 2.5, o.ch);
+  ctx.fillStyle = '#fff3a0'; ctx.fillRect(o.x, y+3, 4, 4);
+  ctx.fillStyle = '#ff3b3b'; ctx.fillRect(o.x+o.w-3, y+3, 3, 4);
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(o.x+4, y+o.bh*0.55, o.w-8, 2);
+  [0.22, 0.78].forEach(f => {
+    const wx = o.x+o.w*f, wy = CAR_BASE-1;
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(wx, wy, 5.8, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#9aa'; ctx.beginPath(); ctx.arc(wx, wy, 2.3, 0, 6.283); ctx.fill();
   });
+}
 
-  drawPlayer();
-
-  if(state.student){
-    const s=state.student;
-    ctx.fillStyle='#f4d19c'; ctx.beginPath(); ctx.arc(s.x+s.w/2, s.y+6, 7, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle='#2b7a78'; ctx.fillRect(s.x+4, s.y+12, s.w-8, s.h-16);
-    ctx.fillStyle='#e07a1f'; ctx.fillRect(s.x, s.y+14, 6, s.h-22);
-  }
-
-  dust.forEach(p=>{ ctx.globalAlpha=Math.max(0,p.life/40); ctx.fillStyle='#cfcfcf';
-    ctx.beginPath(); ctx.arc(p.x,p.y,4,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; });
-
-  if(state.paused && !state.dead && !state.cleared){
-    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,0,cv.width,cv.height);
-    ctx.fillStyle='#f1faee'; ctx.font='bold 20px Vazirmatn'; ctx.textAlign='center';
-    ctx.fillText('متوقف شده', cv.width/2, cv.height/2);
+function drawLayer(L, col, factor, wi, windows){
+  const off = (scrollX*factor) % L.total, w = WORLDS[wi];
+  for(const k of [0, L.total]) for(const b of L.items){
+    const x = b.x - off + k; if(x > W || x + b.w < 0) continue;
+    const top = BASE - b.h;
+    ctx.fillStyle = col; ctx.fillRect(x, top, b.w, b.h);
+    if(b.roof > 0.72) ctx.fillRect(x+b.w*0.5-1, top-9, 2, 9);
+    else if(b.roof < 0.25) ctx.fillRect(x+3, top-4, b.w-6, 4);
+    if(windows && gfxOn()){
+      ctx.fillStyle = w.win;
+      for(let wy=top+7; wy<BASE-8; wy+=11) for(let wx=x+5; wx<x+b.w-7; wx+=9)
+        if(hash(b.x*1.7 + (wx-x)*3.1 + (wy-top)*5.3 + wi*13) > 0.42) ctx.fillRect(wx, wy, 4, 6);
+    }
   }
 }
 
-document.getElementById('pauseBtn').onclick=()=>{
-  state.paused=!state.paused;
-  document.getElementById('pauseBtn').textContent = state.paused ? '▶ ادامه' : '⏸ توقف';
+function drawWeather(dt){
+  if(!gfxOn()) return;
+  const wx = WORLDS[curWorld].wx; if(!wx) return;
+  ctx.strokeStyle = 'rgba(200,220,255,.55)'; ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 1;
+  for(const d of drops){
+    if(wx === 1){ d.y += d.v*4*dt; d.x -= 1.5*dt; ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x-2, d.y+8); ctx.stroke(); }
+    else { d.y += d.v*0.5*dt; d.x += Math.sin(d.y*0.05 + d.s*6)*0.4*dt; ctx.beginPath(); ctx.arc(d.x, d.y, 1.2+d.s*1.2, 0, 6.283); ctx.fill(); }
+    if(d.y > H){ d.y = -8; d.x = Math.random()*W; }
+    if(d.x < 0) d.x = W; if(d.x > W) d.x = 0;
+  }
+}
+
+function drawCloud(c, t){
+  const grow = Math.min(1, t/14), fade = t > 82 ? Math.max(0, 1-(t-82)/28) : 1;
+  ctx.save(); ctx.globalAlpha = fade;
+  c.puffs.forEach(p => {
+    const a = p.a + t*p.sp, wob = 1 + 0.25*Math.sin(t*0.35 + p.ph);
+    const x = c.x + Math.cos(a)*p.d*grow*wob*1.3, y = c.y + Math.sin(a)*p.d*grow*wob*0.85;
+    const r = p.r*(0.6+0.5*grow)*(1 + 0.1*Math.sin(t*0.5 + p.ph));
+    ctx.fillStyle = `rgb(${p.g},${p.g},${p.g})`; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.lineWidth = 1; ctx.stroke();
+  });
+  c.stars.forEach((s, i) => {
+    const a = s.a + t*s.sp;
+    star(c.x + Math.cos(a)*s.d*grow*1.4, c.y + Math.sin(a)*s.d*grow*0.9, s.r, i%2 ? '#ffe066' : '#ffffff');
+  });
+  if(t < 70){
+    const sc = 0.6 + Math.min(1, t/8)*0.5;
+    ctx.save(); ctx.translate(c.x, c.y - 52); ctx.scale(sc, sc); ctx.rotate(-0.12);
+    ctx.font = '900 24px Vazirmatn'; ctx.textAlign = 'center';
+    ctx.lineWidth = 5; ctx.strokeStyle = '#7a1f24'; ctx.strokeText('بوم!', 0, 0);
+    ctx.fillStyle = '#ffd166'; ctx.fillText('بوم!', 0, 0); ctx.restore();
+  }
+  ctx.restore();
+}
+
+/* ---------------- رسم صحنه ---------------- */
+let lastT = performance.now(), dtNow = 1;
+function draw(dt){
+  const s = state, w = WORLDS[curWorld];
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, W, H);
+  if(w.nt && gfxOn()){ ctx.fillStyle = '#fff'; skyStars.forEach(t => { ctx.globalAlpha = .35 + hash(t.x)*.6; ctx.fillRect(t.x, t.y, t.r, t.r); }); ctx.globalAlpha = 1; }
+  ctx.fillStyle = w.orb; ctx.globalAlpha = .22; ctx.beginPath(); ctx.arc(540, 46, 27, 0, 6.283); ctx.fill();
+  ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(540, 46, 15, 0, 6.283); ctx.fill();
+
+  drawLayer(layers[0], w.b1, 0.25, curWorld, false);
+  drawLayer(layers[1], w.b2, 0.5, curWorld, true);
+
+  ctx.fillStyle = w.curb; ctx.fillRect(0, BASE, W, 6);
+  ctx.fillStyle = w.road; ctx.fillRect(0, BASE+6, W, H-BASE-6);
+  ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 2; ctx.setLineDash([18, 12]);
+  ctx.lineDashOffset = (scrollX % 30); ctx.beginPath(); ctx.moveTo(0, 222); ctx.lineTo(W, 222); ctx.stroke(); ctx.setLineDash([]);
+
+  s.obstacles.forEach(drawCar);
+
+  const hidden = s.phase === 'cloud' && s.cloudT > 6;
+  if(s.student && !hidden){
+    drawHuman(Object.assign({}, STUDENT, {x:s.student.x, feet:GROUND, phase:s.student.ph, air:false}));
+  }
+  if(!hidden){
+    if(s.phase === 'dead'){
+      ctx.save(); ctx.translate(PX, GROUND); ctx.rotate(-1.35);
+      drawHuman(Object.assign({}, PLAYER, {x:0, feet:0, phase:0, air:false, still:true, faceImg:faceOK ? face : null}));
+      ctx.restore();
+      for(let i=0;i<3;i++){ const a = s.dizzy*0.12 + i*2.09; star(PX-46+Math.cos(a)*14, GROUND-40+Math.sin(a)*5, 5, '#ffe066'); }
+    } else {
+      drawHuman(Object.assign({}, PLAYER, {x:PX, feet:s.y, phase:s.legPhase, air:s.air, faceImg:faceOK ? face : null}));
+    }
+  }
+  if(s.cloud) drawCloud(s.cloud, s.cloudT);
+
+  drawWeather(dt);
+
+  if(s.paused && s.phase === 'play'){
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#f1faee'; ctx.font = '900 22px Vazirmatn'; ctx.textAlign = 'center';
+    ctx.fillText('متوقف شده', W/2, H/2);
+  }
+}
+
+function updateHud(){
+  const s = state;
+  $('lvl').textContent = 'مرحله ' + toFa(s.level) + ' · ' + WORLDS[worldOf(s.level)].name;
+  $('score').textContent = toFa(String(Math.floor(s.score)).padStart(4, '0'));
+  $('prog').style.width = Math.min(100, s.score/s.target*100) + '%';
+}
+
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = clamp((now - lastT)/16.667, 0, 2.5); lastT = now; dtNow = dt;
+  if(screen !== 'game' || !state){ stopMusic(); return; }
+  const s = state;
+  if(s.phase === 'play' && !s.paused) startMusic(); else stopMusic();
+  if(!s.paused) update(dt);
+  if(screen !== 'game') return;
+  draw(dt); updateHud();
+}
+
+/* ---------------- نقشه مرحله‌ها (مثل ماریو) ---------------- */
+let tt;
+function toast(msg, ms = 3000){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), ms);
+}
+const nodePos = i => ({ x: 92 - i*(84/9), y: 50 + Math.sin(i*0.95 + 0.6)*30 });
+
+function renderMap(pop){
+  const wi = mapWorld, w = WORLDS[wi];
+  $('map').style.background = `linear-gradient(180deg, ${w.s1}, ${w.s2})`;
+  $('worldName').textContent = 'دنیای ' + toFa(wi+1) + ' · ' + w.name;
+  let pts = '', html = '';
+  for(let i=0;i<10;i++){
+    const L = wi*10 + i + 1, p = nodePos(i);
+    pts += `${p.x},${p.y} `;
+    let cls = L < unlocked ? 'done' : (L === unlocked ? 'cur' : 'locked');
+    if(pop === L) cls += ' pop';
+    const isLocked = cls.startsWith('locked');
+    html += `<button class="node ${cls}" style="left:${p.x}%;top:${p.y}%" data-l="${L}">${isLocked ? '🔒' : toFa(L)}` +
+      (L === unlocked && unlocked <= 100 ? `<img class="avatar" src="face.png" alt="" onerror="this.style.display='none'">` : '') + `</button>`;
+  }
+  $('track').innerHTML =
+    `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="3" stroke-dasharray="2 3" vector-effect="non-scaling-stroke" stroke-linecap="round"/></svg>` + html;
+  $('mapInfo').textContent = 'مرحله‌های باز شده: ' + toFa(Math.min(unlocked, 100)) + ' از ۱۰۰';
+  $('prevWorld').disabled = wi === 0;
+  $('nextWorld').disabled = wi === 9;
+  const cont = Math.min(unlocked, 100);
+  $('continueBtn').textContent = '▶ ادامه — مرحله ' + toFa(cont);
+}
+
+function showMap(pop, cleared){
+  screen = 'map'; stopMusic();
+  $('banner').classList.remove('show');
+  $('gameScreen').classList.remove('active'); $('map').classList.add('active');
+  mapWorld = worldOf(pop || Math.min(unlocked, 100));
+  if(cleared && !pop) mapWorld = worldOf(cleared);
+  renderMap(pop);
+  if(pop){
+    sfx.unlock();
+    toast(pop % 10 === 1 ? '🔓 دنیای جدید باز شد: ' + WORLDS[worldOf(pop)].name : '🔓 مرحله ' + toFa(pop) + ' باز شد!', 3600);
+  } else if(cleared === 100){
+    sfx.unlock(); toast('🎉 همه ۱۰۰ مرحله تموم شد!', 4500);
+  } else if(cleared){
+    toast('✓ مرحله ' + toFa(cleared) + ' دوباره تموم شد');
+  }
+}
+
+function startLevel(L){
+  screen = 'game';
+  $('map').classList.remove('active'); $('gameScreen').classList.add('active');
+  buildWorld(worldOf(L)); newRun(L);
+}
+
+$('track').addEventListener('click', e => {
+  const b = e.target.closest('.node'); if(!b) return;
+  const L = Number(b.dataset.l);
+  if(L > unlocked){ sfx.click(); toast('این مرحله هنوز قفله 🔒 اول مرحله‌های قبلی رو تموم کن'); return; }
+  sfx.click(); startLevel(L);
+});
+$('prevWorld').onclick = () => { if(mapWorld > 0){ mapWorld--; renderMap(); sfx.click(); } };
+$('nextWorld').onclick = () => { if(mapWorld < 9){ mapWorld++; renderMap(); sfx.click(); } };
+$('continueBtn').onclick = () => { sfx.click(); startLevel(Math.min(unlocked, 100)); };
+
+/* ---------------- منوی یکپارچه ---------------- */
+function openMenu(){
+  modalOpen = true; $('modal').classList.add('open');
+  $('gameOnly').style.display = screen === 'game' ? 'flex' : 'none';
+  if(screen === 'game' && state.phase === 'play' && !state.paused){ state.paused = true; pausedByMenu = true; }
+}
+function closeMenu(){
+  modalOpen = false; $('modal').classList.remove('open');
+  if(pausedByMenu && state){ state.paused = false; pausedByMenu = false; }
+}
+$('menuBtn').onclick = openMenu;
+$('mapSettings').onclick = openMenu;
+$('closeMenu').onclick = closeMenu;
+$('resumeBtn').onclick = closeMenu;
+$('toMapBtn').onclick = () => { pausedByMenu = false; closeMenu(); showMap(null, null); };
+$('retryBtn').onclick = restart;
+$('bannerMap').onclick = () => showMap(null, null);
+$('resetBtn').onclick = () => {
+  if(!confirm('مطمئنی؟ همه پیشرفت و مرحله‌های باز شده پاک میشه.')) return;
+  unlocked = 1; store.set('hbLevel', 1); best = 0; store.set('hbBest', 0);
+  pausedByMenu = false; closeMenu(); showMap(null, null);
 };
-document.getElementById('settingsBtn').onclick=()=>document.getElementById('modal').classList.add('open');
-document.getElementById('closeSettings').onclick=()=>document.getElementById('modal').classList.remove('open');
-document.getElementById('resetProgress').onclick=()=>{
-  unlocked=1; localStorage.setItem('hbLevel',1);
-  newRun(1); document.getElementById('modal').classList.remove('open');
-};
-document.getElementById('downloadBtn').onclick=()=>{
-  const blob=new Blob(['<!DOCTYPE html>\n'+document.documentElement.outerHTML],{type:'text/html'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='aghaye-heydari.html'; a.click();
+$('downloadBtn').onclick = async () => {
+  let html;
+  try{ const r = await fetch(location.href); html = await r.text(); }
+  catch(e){ html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([html], {type:'text/html'}));
+  a.download = 'aghaye-heydari.html'; a.click();
 };
 
-loop();
+/* ---------------- ورودی ---------------- */
+document.addEventListener('keydown', e => {
+  if(e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW'){ e.preventDefault(); if(!e.repeat) act(); }
+  else if(e.code === 'Escape' || e.code === 'KeyP'){ modalOpen ? closeMenu() : openMenu(); }
+  else if(e.code === 'Enter' && screen === 'game' && state.phase === 'dead' && !modalOpen){ restart(); }
+});
+cv.addEventListener('pointerdown', act);
+document.addEventListener('click', e => { const b = e.target.closest('button'); if(b) b.blur(); });
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden && screen === 'game' && state && state.phase === 'play' && !modalOpen) openMenu();
+});
+
+/* ---------------- شروع ---------------- */
+buildWorld(0); state = freshState(1);
+showMap(null, null);
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>
