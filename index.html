@@ -65,9 +65,9 @@
   button:active{ transform:translateY(1px); }
 
   #toast{ position:absolute; top:10px; left:50%; transform:translate(-50%,-70px); background:#0b0e24; border:2px solid var(--amber); color:#fff;
-    padding:10px 18px; border-radius:12px; font-weight:900; z-index:8; transition:transform .35s cubic-bezier(.2,1.4,.4,1); white-space:nowrap;
+    padding:10px 18px; border-radius:12px; font-weight:900; z-index:8; opacity:0; visibility:hidden; pointer-events:none; transition:transform .35s cubic-bezier(.2,1.4,.4,1), opacity .3s, visibility .3s; white-space:nowrap;
     max-width:94vw; overflow:hidden; text-overflow:ellipsis; box-shadow:0 8px 24px rgba(0,0,0,.5); }
-  #toast.show{ transform:translate(-50%,0); }
+  #toast.show{ transform:translate(-50%,0); opacity:1; visibility:visible; }
 
   .modal{ position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; z-index:20; }
   .modal.open{ display:flex; }
@@ -76,6 +76,14 @@
   .row{ margin:12px 0; display:flex; flex-direction:column; gap:6px; font-size:.9rem; }
   select, input[type=range]{ width:100%; }
   select{ font-family:inherit; padding:6px; border-radius:8px; background:#0b0e24; color:#fff; border:2px solid var(--line); }
+  .lbRow{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:9px; background:rgba(255,255,255,.05); margin:5px 0; font-size:.88rem; }
+  .lbRow.me{ background:rgba(244,162,89,.22); border:1px solid var(--amber); }
+  .lbRow b{ width:26px; text-align:center; }
+  .lbRow .nm{ flex:1; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lbRow small{ opacity:.85; }
+  input[type=text]{ flex:1; font-family:inherit; padding:8px; border-radius:8px; background:#0b0e24; color:#fff; border:2px solid var(--line); min-width:0; }
+  .credit{ margin-top:16px; font-size:.78rem; opacity:.7; text-align:center; }
+  .credit a{ color:var(--amber); text-decoration:none; font-weight:700; }
 </style>
 </head>
 <body>
@@ -95,6 +103,7 @@
     <div class="mapBottom">
       <span id="mapInfo"></span>
       <div style="display:flex;gap:8px">
+        <button class="ghost" id="lbBtn">🏆 لیدربورد</button>
         <button class="ghost" id="mapSettings">⚙ تنظیمات</button>
         <button id="continueBtn">▶ ادامه</button>
       </div>
@@ -123,6 +132,8 @@
   </div>
 </div>
 
+<div class="credit">ساخته شده توسط <a href="https://github.com/HesamAbner" target="_blank" rel="noopener"><span dir="ltr">hesamabner</span></a></div>
+
 <!-- ===== منوی یکپارچه: توقف + تنظیمات ===== -->
 <div class="modal" id="modal">
   <div class="panel">
@@ -144,6 +155,19 @@
   </div>
 </div>
 
+<!-- ===== لیدربورد ===== -->
+<div class="modal" id="lbModal">
+  <div class="panel">
+    <h2>🏆 لیدربورد</h2>
+    <div id="lbOff" style="display:none;font-size:.85rem;opacity:.85;margin:8px 0">لیدربورد هنوز تنظیم نشده.</div>
+    <div class="row"><label>اسم تو</label>
+      <div style="display:flex;gap:6px"><input type="text" id="lbName" maxlength="16" placeholder="اسمت رو بنویس"><button id="lbSave">ذخیره</button></div>
+    </div>
+    <div id="lbList"></div>
+    <div class="bar"><button id="lbClose">بستن</button></div>
+  </div>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
 const cv = $('game'), ctx = cv.getContext('2d');
@@ -160,6 +184,7 @@ const store = {
 };
 let unlocked = clamp(Number(store.get('hbLevel',1)) || 1, 1, 101);
 let best = Number(store.get('hbBest',0)) || 0;
+window.getProgress = () => ({ cleared: clamp(unlocked,1,101) - 1, best: Math.floor(best) });
 const settings = store.get('hbSet', {vol:60, diff:1, gfx:true});
 $('volume').value = settings.vol; $('difficulty').value = String(settings.diff); $('graphics').checked = !!settings.gfx;
 function saveSettings(){ store.set('hbSet', {vol:Number($('volume').value), diff:Number($('difficulty').value), gfx:$('graphics').checked}); }
@@ -269,6 +294,7 @@ function restart(){ newRun(state.level); }
 function die(){
   const s = state; s.phase = 'dead'; s.dizzy = 0; sfx.die();
   best = Math.max(best, Math.floor(s.score)); store.set('hbBest', best);
+  if(window.LB) LB.submit();
   $('bannerSub').textContent = 'امتیاز: ' + toFa(Math.floor(s.score)) + ' — رکورد: ' + toFa(best);
   $('banner').classList.add('show');
 }
@@ -286,10 +312,12 @@ function catchStudent(){
   s.phase = 'cloud'; s.cloudT = 0;
   s.cloud = makeCloud((PX + st.x)/2, GROUND - 26);
   sfx.poof(); sfx.win();
+  best = Math.max(best, Math.floor(s.score)); store.set('hbBest', best);
   if(s.level >= unlocked){
     unlocked = Math.min(101, s.level + 1); store.set('hbLevel', unlocked);
     s.pop = s.level < 100 ? s.level + 1 : null;
   }
+  if(window.LB) LB.submit();
 }
 
 /* ---------------- به‌روزرسانی ---------------- */
@@ -660,6 +688,7 @@ $('downloadBtn').onclick = async () => {
 
 /* ---------------- ورودی ---------------- */
 document.addEventListener('keydown', e => {
+  if(e.target.closest && e.target.closest('input,select,textarea')) return;
   if(e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW'){ e.preventDefault(); if(!e.repeat) act(); }
   else if(e.code === 'Escape' || e.code === 'KeyP'){ modalOpen ? closeMenu() : openMenu(); }
   else if(e.code === 'Enter' && screen === 'game' && state.phase === 'dead' && !modalOpen){ restart(); }
@@ -674,6 +703,78 @@ document.addEventListener('visibilitychange', () => {
 buildWorld(0); state = freshState(1);
 showMap(null, null);
 requestAnimationFrame(frame);
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, setDoc, collection, query, orderBy, limit, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ⬇️ اطلاعات پروژه‌ی Firebase خودت رو اینجا جایگزین کن
+const FIREBASE_CONFIG = {
+  apiKey: "PASTE_API_KEY",
+  authDomain: "PASTE_PROJECT.firebaseapp.com",
+  projectId: "PASTE_PROJECT_ID",
+  appId: "PASTE_APP_ID"
+};
+
+const enabled = !FIREBASE_CONFIG.apiKey.startsWith('PASTE');
+let db, uidPromise;
+if(enabled){
+  const app = initializeApp(FIREBASE_CONFIG);
+  db = getFirestore(app);
+  uidPromise = signInAnonymously(getAuth(app)).then(c => c.user.uid).catch(() => null);
+}
+const el = id => document.getElementById(id);
+const fa = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+const getName = () => (localStorage.getItem('hbName') || '').trim().slice(0, 16);
+
+let last = 0, timer = null;
+async function doSubmit(){
+  if(!enabled) return;
+  const name = getName(); if(!name) return;
+  const p = window.getProgress(); const best = Math.min(p.best, 5000);
+  if(p.cleared <= 0 && best <= 0) return;
+  const uid = await uidPromise; if(!uid) return;
+  try{
+    await setDoc(doc(db, 'scores', uid), { name, cleared:p.cleared, best, rank:p.cleared*10000 + best, updated:serverTimestamp() });
+    last = Date.now();
+  }catch(e){}
+}
+function submit(){
+  clearTimeout(timer);
+  timer = setTimeout(doSubmit, Math.max(0, 11000 - (Date.now() - last)));
+}
+
+async function load(){
+  const list = el('lbList');
+  if(!enabled){ el('lbOff').style.display = 'block'; list.textContent = ''; return; }
+  list.textContent = 'در حال بارگذاری...';
+  try{
+    const [snap, uid] = await Promise.all([
+      getDocs(query(collection(db, 'scores'), orderBy('rank', 'desc'), limit(10))), uidPromise ]);
+    list.textContent = '';
+    if(snap.empty){ list.textContent = 'هنوز کسی امتیازی ثبت نکرده. اولین نفر تو باش!'; return; }
+    let i = 0;
+    snap.forEach(d => {
+      const v = d.data(); i++;
+      const row = document.createElement('div'); row.className = 'lbRow' + (d.id === uid ? ' me' : '');
+      const b = document.createElement('b'); b.textContent = i <= 3 ? ['🥇','🥈','🥉'][i-1] : fa(i);
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = v.name;
+      const sm = document.createElement('small'); sm.textContent = 'مرحله ' + fa(v.cleared);
+      row.append(b, nm, sm); list.appendChild(row);
+    });
+  }catch(e){ list.textContent = 'خطا در دریافت لیدربورد. کمی بعد دوباره امتحان کن.'; }
+}
+
+el('lbBtn').onclick = () => { el('lbName').value = getName(); el('lbModal').classList.add('open'); load(); };
+el('lbClose').onclick = () => el('lbModal').classList.remove('open');
+el('lbSave').onclick = () => {
+  const n = el('lbName').value.trim().slice(0, 16); if(!n) return;
+  localStorage.setItem('hbName', n); last = 0; submit(); setTimeout(load, 11800);
+  el('lbSave').textContent = '✓ ذخیره شد'; setTimeout(() => el('lbSave').textContent = 'ذخیره', 1500);
+};
+window.LB = { submit };
 </script>
 </body>
 </html>
