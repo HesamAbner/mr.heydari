@@ -76,11 +76,6 @@
   .row{ margin:12px 0; display:flex; flex-direction:column; gap:6px; font-size:.9rem; }
   select, input[type=range]{ width:100%; }
   select{ font-family:inherit; padding:6px; border-radius:8px; background:#0b0e24; color:#fff; border:2px solid var(--line); }
-  .lbRow{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:9px; background:rgba(255,255,255,.05); margin:5px 0; font-size:.88rem; }
-  .lbRow.me{ background:rgba(244,162,89,.22); border:1px solid var(--amber); }
-  .lbRow b{ width:26px; text-align:center; }
-  .lbRow .nm{ flex:1; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .lbRow small{ opacity:.85; }
   input[type=text]{ flex:1; font-family:inherit; padding:8px; border-radius:8px; background:#0b0e24; color:#fff; border:2px solid var(--line); min-width:0; }
   .credit{ margin-top:16px; font-size:.78rem; opacity:.7; text-align:center; }
   .credit a{ color:var(--amber); text-decoration:none; font-weight:700; }
@@ -103,7 +98,6 @@
     <div class="mapBottom">
       <span id="mapInfo"></span>
       <div style="display:flex;gap:8px">
-        <button class="ghost" id="lbBtn">🏆 لیدربورد</button>
         <button class="ghost" id="mapSettings">⚙ تنظیمات</button>
         <button id="continueBtn">▶ ادامه</button>
       </div>
@@ -155,18 +149,6 @@
   </div>
 </div>
 
-<!-- ===== لیدربورد ===== -->
-<div class="modal" id="lbModal">
-  <div class="panel">
-    <h2>🏆 لیدربورد</h2>
-    <div id="lbOff" style="display:none;font-size:.85rem;opacity:.85;margin:8px 0">لیدربورد هنوز تنظیم نشده.</div>
-    <div class="row"><label>اسم تو</label>
-      <div style="display:flex;gap:6px"><input type="text" id="lbName" maxlength="16" placeholder="اسمت رو بنویس"><button id="lbSave">ذخیره</button></div>
-    </div>
-    <div id="lbList"></div>
-    <div class="bar"><button id="lbClose">بستن</button></div>
-  </div>
-</div>
 
 <script>
 (function(){
@@ -196,7 +178,6 @@ function saveProgress(){
   store.set('hbLevel', unlocked); store.set('hbSig', sign('L'+unlocked));
   store.set('hbBest', best);      store.set('hbBSig', sign('B'+best));
 }
-window.getProgress = () => ({ cleared: clamp(unlocked,1,101) - 1, best: Math.floor(best) });
 const settings = store.get('hbSet', {vol:60, diff:1, gfx:true});
 $('volume').value = settings.vol; $('difficulty').value = String(settings.diff); $('graphics').checked = !!settings.gfx;
 function saveSettings(){ store.set('hbSet', {vol:Number($('volume').value), diff:Number($('difficulty').value), gfx:$('graphics').checked}); }
@@ -204,9 +185,12 @@ function saveSettings(){ store.set('hbSet', {vol:Number($('volume').value), diff
 const gfxOn = () => $('graphics').checked;
 
 /* ---------------- تصویر صورت ---------------- */
-const face = new Image(); let faceOK = false;
-face.onload = () => faceOK = true;
-face.src = 'face.png';
+const FACES = Array.from({length:10}, (_, i) => {
+  const img = new Image(); img.ok = false; img.onload = () => img.ok = true;
+  img.src = i === 0 ? 'face.png' : `face${i+1}.png`;
+  return img;
+});
+function faceFor(level){ const im = FACES[Math.floor((clamp(level,1,100)-1)/10) % FACES.length]; return im.ok ? im : null; }
 
 /* ---------------- صدا (آرکید ۸بیتی) ---------------- */
 let ac;
@@ -306,7 +290,6 @@ function restart(){ newRun(state.level); }
 function die(){
   const s = state; s.phase = 'dead'; s.dizzy = 0; sfx.die();
   best = Math.max(best, Math.floor(s.score)); saveProgress();
-  if(window.LB) LB.submit();
   $('bannerSub').textContent = 'امتیاز: ' + toFa(Math.floor(s.score)) + ' — رکورد: ' + toFa(best);
   $('banner').classList.add('show');
 }
@@ -330,7 +313,6 @@ function catchStudent(){
     unlocked = Math.min(101, s.level + 1); saveProgress();
     s.pop = s.level < 100 ? s.level + 1 : null;
   }
-  if(window.LB) LB.submit();
 }
 
 /* ---------------- به‌روزرسانی ---------------- */
@@ -569,11 +551,11 @@ function draw(dt){
   if(!hidden){
     if(s.phase === 'dead'){
       ctx.save(); ctx.translate(PX, GROUND); ctx.rotate(-1.35);
-      drawHuman(Object.assign({}, PLAYER, {x:0, feet:0, phase:0, air:false, still:true, faceImg:faceOK ? face : null}));
+      drawHuman(Object.assign({}, PLAYER, {x:0, feet:0, phase:0, air:false, still:true, faceImg:faceFor(1)}));
       ctx.restore();
       for(let i=0;i<3;i++){ const a = s.dizzy*0.12 + i*2.09; star(PX-46+Math.cos(a)*14, GROUND-40+Math.sin(a)*5, 5, '#ffe066'); }
     } else {
-      drawHuman(Object.assign({}, PLAYER, {x:PX, feet:s.y, phase:s.legPhase, air:s.air, faceImg:faceOK ? face : null}));
+      drawHuman(Object.assign({}, PLAYER, {x:PX, feet:s.y, phase:s.legPhase, air:s.air, faceImg:faceFor(s.level)}));
     }
   }
   if(s.cloud) drawCloud(s.cloud, s.cloudT);
@@ -722,68 +704,5 @@ requestAnimationFrame(frame);
 })();
 </script>
 
-<script type="module">
-const SB_URL = "https://xhyhyvgbushqaghiqiqu.supabase.co";
-const SB_KEY = "sb_publishable_HfudeNsfnEV7pCthVvUWbw_5ETPA-x-";
-
-const el = id => document.getElementById(id);
-const fa = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
-const getName = () => (localStorage.getItem('hbName') || '').trim().slice(0, 16);
-const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&3|8)).toString(16); }));
-let myId = localStorage.getItem('hbId');
-if(!myId){ myId = uuid(); localStorage.setItem('hbId', myId); }
-
-async function rpc(fn, body){
-  const r = await fetch(SB_URL + '/rest/v1/rpc/' + fn, {
-    method: 'POST',
-    headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if(!r.ok) throw new Error('http ' + r.status);
-  const t = await r.text(); return t ? JSON.parse(t) : null;
-}
-
-let last = 0, timer = null;
-async function doSubmit(){
-  const name = getName(); if(!name) return;
-  const p = window.getProgress(); const best = Math.min(p.best, 5000);
-  if(p.cleared <= 0 && best <= 0) return;
-  try{
-    await rpc('submit_score', { p_id: myId, p_name: name, p_cleared: Math.min(p.cleared, 100), p_best: best });
-    last = Date.now();
-  }catch(e){}
-}
-function submit(){
-  clearTimeout(timer);
-  timer = setTimeout(doSubmit, Math.max(0, 11000 - (Date.now() - last)));
-}
-
-async function load(){
-  const list = el('lbList');
-  list.textContent = 'در حال بارگذاری...';
-  try{
-    const rows = await rpc('top_scores', { p_me: myId });
-    list.textContent = '';
-    if(!rows || !rows.length){ list.textContent = 'هنوز کسی امتیازی ثبت نکرده. اولین نفر تو باش!'; return; }
-    rows.forEach((v, idx) => {
-      const i = idx + 1;
-      const row = document.createElement('div'); row.className = 'lbRow' + (v.me ? ' me' : '');
-      const b = document.createElement('b'); b.textContent = i <= 3 ? ['🥇','🥈','🥉'][i-1] : fa(i);
-      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = v.name;
-      const sm = document.createElement('small'); sm.textContent = 'مرحله ' + fa(v.cleared);
-      row.append(b, nm, sm); list.appendChild(row);
-    });
-  }catch(e){ list.textContent = 'خطا در دریافت لیدربورد. کمی بعد دوباره امتحان کن.'; }
-}
-
-el('lbBtn').onclick = () => { el('lbName').value = getName(); el('lbModal').classList.add('open'); load(); };
-el('lbClose').onclick = () => el('lbModal').classList.remove('open');
-el('lbSave').onclick = () => {
-  const n = el('lbName').value.trim().slice(0, 16); if(!n) return;
-  localStorage.setItem('hbName', n); submit(); setTimeout(load, 11800);
-  el('lbSave').textContent = '✓ ذخیره شد'; setTimeout(() => el('lbSave').textContent = 'ذخیره', 1500);
-};
-window.LB = { submit };
-</script>
 </body>
 </html>
