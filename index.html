@@ -185,12 +185,8 @@ function saveSettings(){ store.set('hbSet', {vol:Number($('volume').value), diff
 const gfxOn = () => $('graphics').checked;
 
 /* ---------------- تصویر صورت ---------------- */
-const FACES = Array.from({length:10}, (_, i) => {
-  const img = new Image(); img.ok = false; img.onload = () => img.ok = true;
-  img.src = i === 0 ? 'face.png' : `face${i+1}.png`;
-  return img;
-});
-function faceFor(level){ const im = FACES[Math.floor((clamp(level,1,100)-1)/10) % FACES.length]; return im.ok ? im : null; }
+const FACE = new Image(); FACE.ok = false; FACE.onload = () => FACE.ok = true; FACE.src = 'face.png';
+function faceFor(){ return FACE.ok ? FACE : null; }
 
 /* ---------------- صدا (آرکید ۸بیتی) ---------------- */
 let ac;
